@@ -1,21 +1,14 @@
 import matplotlib.pyplot as plt
 
 import numpy as np
-from numpy import linalg as LA
+from numpy import linalg as la
 
 # Разберем вариант 46
-
-
-# import pandas as pd
-
+# Все данные содержаться в папке Variants.
 DIRECTORY = 'Variants/'
 MAIN_NAME = 'testLab1Var'
 END = '.csv'
 VARIANT_NUM = '46'  # '46'
-
-# df = pd.read_csv(DIRECTORY + MAIN_NAME + VARIANT_NUM + END, sep=',', header=None)
-# time_df = df[0]
-
 
 data = np.genfromtxt(DIRECTORY + MAIN_NAME + VARIANT_NUM + END, delimiter=',')
 
@@ -25,6 +18,14 @@ voltage = data[:, 2]  # Напряжение - третий
 time = time[:, np.newaxis]
 current = current[:, np.newaxis]
 voltage = voltage[:, np.newaxis]
+
+# Запишите значение 11-го элемента массива напряжений и временного массива.
+k = 11  # k>0
+print(f'{k}-й элемент voltage: {voltage[k - 1]}\n'
+      f'{k}-й элемент time: {time[k - 1]}')
+
+# 11-й элемент voltage: [1.]
+# 11-й элемент time: [0.01]
 
 fig, (voltage_plot, current_plot) = plt.subplots(2, 1, sharex=True)
 
@@ -60,14 +61,21 @@ plt.close()
 X = np.concatenate([voltage[0:-2], current[0:-2]], axis=1)
 Y = current[1:-1]
 
-K = LA.inv(X.T @ X) @ X.T @ Y
-# Это же выражение в методичке написано как K = np.dot(np.dot(LA.inv(np.dot(X.T, X)), X.T), Y)
+K = la.inv(X.T @ X) @ X.T @ Y
+# Это же выражение в методичке написано как K = np.dot(np.dot(la.inv(np.dot(X.T, X)), X.T), Y)
 
 Td = 0.001  # Задано в условии эксперимента
 
 R = 1 / K[0] * (1 - K[1])  # То же самое что и (1 - K[1]) / K[0]
 T = -Td / np.log(K[1])
 L = T * R
+
+print(f'Расчетные значения сопротивления и индуктивности:\n'
+      f'R = {R}\n'
+      f'L = {L}')
+# Расчетные значения сопротивления и индуктивности:
+# R = [2.57400698]
+# L = [0.27002006]
 
 current_est = X @ K
 
@@ -96,7 +104,7 @@ for i in range(0, n - 1):  # По умолчанию шаг и так равен
     new_voltage = new_voltage[:, np.newaxis]
     X_ = np.concatenate([new_voltage[1:-1], new_current[0:-2]], axis=1)
     Y_ = new_current[1:-1]  # TODO: В методичке почему-то используется обычный массив current / Поправка, в англ. методе
-    K_ = LA.inv(X_.T @ X_) @ X_.T @ Y_
+    K_ = la.inv(X_.T @ X_) @ X_.T @ Y_
 
     if K_[1] > 0:  # Натуральный лог K[1] имеет смысл только в этом случае
         R_ = 1 / K_[0] * (1 - K_[1])
@@ -112,3 +120,8 @@ print(f'Standard deviation of R:\t {np.std(R_est)}')
 
 print(f'Mean value of L:\t\t\t {np.mean(L_est)} Hn')
 print(f'Standard deviation of L:\t {np.std(L_est)}')
+
+# Mean value of R:			 1.9460125109477884 Ohm
+# Standard deviation of R:	 0.16134122591606292
+# Mean value of L:			 0.2767766603689984 Hn
+# Standard deviation of L:	 0.002333117109094485

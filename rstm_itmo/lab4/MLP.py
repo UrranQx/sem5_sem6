@@ -113,8 +113,9 @@ for i in range(NUM_ITERATIONS):
 with open(DIRECTORY + TEST_FILENAME, 'r') as data_file:
     test_data = data_file.readlines()
     data_file.close()
-    values = test_data[int(np.random.uniform(0, 9999))].split(',')
-    inputs = (np.asarray(values[1:], dtype=np.float64) / 255 * 0.999) + 0.001
+    random_index = int(np.random.uniform(0, len(test_data) - 1))
+    values_at_random_index = test_data[random_index].split(',')
+    inputs = (np.asarray(values_at_random_index[1:], dtype=np.float64) / 255 * 0.999) + 0.001
     out_session = net_output(weights_in2hidden, weights_hidden2out, inputs, return_hidden=0)
     print(np.argmax(out_session))
 

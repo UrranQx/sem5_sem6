@@ -1,8 +1,8 @@
 import numpy as np
 
 # Входные данные: 10 положительных целых чисел
-numbers = [52, 69, 69, 22, 10, 43, 34, 82, 72, 64]
-
+# numbers = [52, 69, 69, 22, 10, 43, 34, 82, 72, 64]
+numbers = [19, 73, 68, 94, 34, 33, 76, 69, 37, 71]
 # Шаг 1: Вычисляем экспоненты
 exp_values = np.exp(numbers)
 
@@ -29,4 +29,4 @@ def y(x, min):
 min = min(numbers)
 new_values = [y(x, min) for x in numbers]
 for i in range(len(new_values)):
-    print(f'exp_norm: {new_values[i]:.4f}\t{new_values[i]:.3f}:\tbefore {numbers[i]}')
+    print(f'exp_norm: {new_values[i]:.4f}\t\tокруглить до 3 знаков\t\t{new_values[i]:.3f}:\tbefore {numbers[i]}')

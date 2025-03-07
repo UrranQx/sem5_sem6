@@ -104,7 +104,7 @@ def plot_image(pixels: np.array):
 input_nodes, hidden_nodes, out_nodes, learn_speed = init_net()
 
 weights_in2hidden, weights_hidden2out = create_net(input_nodes, hidden_nodes, out_nodes)
-NUM_ITERATIONS = 10
+NUM_ITERATIONS = 5
 for i in range(NUM_ITERATIONS):
     print('Test #', i + 1)
     weights_in2hidden, weights_hidden2out = train_set(weights_in2hidden, weights_hidden2out, learn_speed)

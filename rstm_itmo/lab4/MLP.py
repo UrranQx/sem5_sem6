@@ -117,4 +117,19 @@ with open(DIRECTORY + TEST_FILENAME, 'r') as data_file:
     inputs = (np.asarray(values[1:], dtype=np.float64) / 255 * 0.999) + 0.001
     out_session = net_output(weights_in2hidden, weights_hidden2out, inputs, return_hidden=0)
     print(np.argmax(out_session))
-    plot_image(np.asarray(values[1:], dtype=np.float64))
+
+    plot_image(np.asarray(values_at_random_index[1:], dtype=np.float64))
+
+    # Есть еще следующие задания в методичке:
+    # Вставьте изображение n-го элемента в набор данных, где n - ваш вариант
+    # Найдите номер, соответствующий n-му элементу набора данных, где n - ваш вариант.
+    # Пусть номер варианта будет 46
+    VARIANT = 46
+    values_at_variant_index = test_data[VARIANT - 1].split(',')
+    print(f'NUM at VARIANT index = {values_at_variant_index[0]}')
+    inputs = (np.asarray(values_at_variant_index[1:], dtype=np.float64) / 255 * 0.999) + 0.001
+    out_session = net_output(weights_in2hidden, weights_hidden2out, inputs, return_hidden=0)
+    print(f'MLP prediction = {np.argmax(out_session)}\n'
+          f'Actual = {values_at_variant_index[0]}')
+
+    plot_image(np.asarray(values_at_variant_index[1:], dtype=np.float64))

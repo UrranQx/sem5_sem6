@@ -1,7 +1,7 @@
 from utils import objective_function
 from utils import gradient as utils_gradient
 from utils import hessian as utils_hess
-from make_graphs import plot_trajectory
+import make_graphs
 import numpy as np
 import numpy.linalg as la
 
@@ -283,13 +283,15 @@ methods_boarders = {
 }
 
 if __name__ == "__main__":
-    benchmark_methods(
-        reference_answer=reference_answer,
-        optimization_methods=optimization_methods,
-        stop_value=0.0001,
-        tol=tolerance,
-        num_experiments=num_experiments
-    )
+    benchmark = False
+    if benchmark:
+        benchmark_methods(
+            reference_answer=reference_answer,
+            optimization_methods=optimization_methods,
+            stop_value=0.0001,
+            tol=tolerance,
+            num_experiments=num_experiments
+        )
 
     for method in optimization_methods:
         X_boarders = methods_boarders[method]
@@ -297,4 +299,5 @@ if __name__ == "__main__":
                                                       stop_value=0.001,
                                                       X_borders=X_boarders
                                                       )
-        plot_trajectory(history_X, func, method)
+        make_graphs.plot_trajectory(history_X, func, method)
+        make_graphs.plot_trajectory_3d(history_X, func, method, print_table=False)

@@ -137,7 +137,7 @@ def absolute_optimization(
         stop_value: float = 1e-2,
         max_steps: int = 1000,
         epsilon: float = 1e-100,
-) -> tuple[np.ndarray[tuple[int, ...], np.dtype[np.float64]], int]:
+):
     """
 
     :param optimization_method: метод оптимизации (str)
@@ -230,7 +230,7 @@ def absolute_optimization(
         if stop_checks[stop_rule]():
             break
 
-    X_ans = np.asarray(X[:counter + 1], dtype=np.float64)
+    X_ans = X[:counter + 1]
     iterations = counter  # -1 т.к.
 
     return X_ans, iterations

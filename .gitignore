@@ -15,10 +15,10 @@ build/
 .settings/
 
 # MNIST data files
-*.ubyte
-*.idx3-ubyte
-*.idx1-ubyte
-mnist_data/
+#*.ubyte
+#*.idx3-ubyte
+#*.idx1-ubyte
+#java_cnn/mnist_data/
 
 # Python
 __pycache__/

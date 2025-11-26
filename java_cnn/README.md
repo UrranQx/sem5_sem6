@@ -66,6 +66,10 @@ cd java_cnn
 mkdir -p build
 javac --add-modules jdk.incubator.vector -d build $(find src -name "*.java")
 ```
+Или
+```bash
+javac --add-modules jdk.incubator.vector -d build src/main/java/cnn/*.java src/main/java/cnn/layers/*.java src/main/java/cnn/utils/*.java src/main/java/cnn/data/*.java
+```
 
 ## Запуск
 
@@ -81,8 +85,19 @@ java --add-modules jdk.incubator.vector -cp build cnn.Main
 - `train-labels-idx1-ubyte.gz`
 - `t10k-images-idx3-ubyte.gz`
 - `t10k-labels-idx1-ubyte.gz`
+Или если используете EMNIST, то для большого набора цифр:
+- `emnist-digits-train-images-idx3-ubyte.gz`
+- `emnist-digits-train-labels-idx1-ubyte.gz`
+- `emnist-digits-test-images-idx3-ubyte.gz`
+- `emnist-digits-test-labels-idx1-ubyte.gz`
+Малого:
+- `emnist-mnist-train-images-idx3-ubyte.gz`
+- `emnist-mnist-train-labels-idx1-ubyte.gz`
+- `emnist-mnist-test-images-idx3-ubyte.gz`
+- `emnist-mnist-test-labels-idx1-ubyte.gz`
 
 Файлы можно скачать с: http://yann.lecun.com/exdb/mnist/
+Или с https://biometrics.nist.gov/cs_links/EMNIST/gzip.zip
 
 Если файлы не найдены, программа автоматически генерирует синтетические данные для тестирования.
 

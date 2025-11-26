@@ -8,7 +8,7 @@ import cnn.utils.Tensor3D;
 
 import java.io.IOException;
 import java.util.Random;
-
+import java.io.File;
 /**
  * Main class for CNN MNIST classification
  * 
@@ -43,7 +43,19 @@ public class Main {
         try {
             // Load MNIST data
             System.out.println("\n[1] Loading MNIST dataset...");
-            MNISTLoader loader = new MNISTLoader("mnist_data");
+
+            System.out.println("Текущая рабочая директория: " + System.getProperty("user.dir"));
+
+            // Попробуйте, например, проверить, существует ли папка mnist_data в текущей директории
+            File mnistFolder = new File(System.getProperty("user.dir") + File.separator + "mnist_data");
+            if (mnistFolder.exists() && mnistFolder.isDirectory()) {
+                System.out.println("Папка найдена!");
+            } else {
+                System.out.println("Папка mnist_data НЕ найдена в текущей директории.");
+            }
+
+            // MNISTLoader loader = new MNISTLoader("mnist_data");
+            MNISTLoader loader = new MNISTLoader(System.getProperty("user.dir") + File.separator + "mnist_data");
             loader.load();
             
             // Split data 70/30

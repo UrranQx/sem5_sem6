@@ -186,10 +186,24 @@ public class VectorOps {
     
     /**
      * ReLU derivative: 1 if x > 0, 0 otherwise
+     * Uses Vector API for vectorized comparison
      */
     public static float[] reluDerivative(float[] a) {
         float[] result = new float[a.length];
-        for (int i = 0; i < a.length; i++) {
+        int i = 0;
+        int upperBound = SPECIES.loopBound(a.length);
+        FloatVector zero = FloatVector.zero(SPECIES);
+        FloatVector one = FloatVector.broadcast(SPECIES, 1.0f);
+        
+        for (; i < upperBound; i += SPECIES.length()) {
+            FloatVector va = FloatVector.fromArray(SPECIES, a, i);
+            // Create mask where elements > 0
+            var mask = va.compare(jdk.incubator.vector.VectorOperators.GT, zero);
+            // Select 1 where mask is true, 0 otherwise
+            zero.blend(one, mask).intoArray(result, i);
+        }
+        
+        for (; i < a.length; i++) {
             result[i] = a[i] > 0 ? 1.0f : 0.0f;
         }
         return result;
@@ -197,18 +211,31 @@ public class VectorOps {
     
     /**
      * Softmax activation
+     * Note: Math.exp is not vectorizable in Vector API, so we use scalar operations
+     * but vectorize the final normalization step
      */
     public static float[] softmax(float[] a) {
         float[] result = new float[a.length];
         float maxVal = max(a);
         
+        // Compute exp(a[i] - max) - scalar since Math.exp is not vectorizable
         float sum = 0;
         for (int i = 0; i < a.length; i++) {
             result[i] = (float) Math.exp(a[i] - maxVal);
             sum += result[i];
         }
         
-        for (int i = 0; i < a.length; i++) {
+        // Vectorize the division
+        int i = 0;
+        int upperBound = SPECIES.loopBound(a.length);
+        FloatVector divisor = FloatVector.broadcast(SPECIES, sum);
+        
+        for (; i < upperBound; i += SPECIES.length()) {
+            FloatVector va = FloatVector.fromArray(SPECIES, result, i);
+            va.div(divisor).intoArray(result, i);
+        }
+        
+        for (; i < a.length; i++) {
             result[i] /= sum;
         }
         

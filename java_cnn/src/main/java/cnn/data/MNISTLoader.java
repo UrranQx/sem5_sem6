@@ -145,11 +145,12 @@ public class MNISTLoader {
         float[][] image = new float[28][28];
         int[][] pattern = DIGIT_PATTERNS[digit];
         
-        // Random offset for position variation
-        int offsetX = rand.nextInt(5) - 2 + 2;  // Center offset
-        int offsetY = rand.nextInt(5) - 2 + 4;
+        // Random offset for position variation (-2 to +2 from center position)
+        // Base offsets: X=2 for horizontal centering, Y=4 for vertical centering
+        int offsetX = 2 + (rand.nextInt(5) - 2);  // Range: 0-4
+        int offsetY = 4 + (rand.nextInt(5) - 2);  // Range: 2-6
         
-        // Scale factor (pattern is 5x7, scale to ~20x24)
+        // Scale factor (pattern is 5x7, scale to ~20x21)
         int scaleX = 4;
         int scaleY = 3;
         

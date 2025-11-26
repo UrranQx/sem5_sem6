@@ -1,0 +1,36 @@
+# Java build artifacts
+*.class
+*.jar
+*.war
+*.ear
+target/
+build/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# MNIST data files
+*.ubyte
+*.idx3-ubyte
+*.idx1-ubyte
+mnist_data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log

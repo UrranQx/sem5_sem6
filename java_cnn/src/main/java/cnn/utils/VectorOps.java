@@ -438,6 +438,7 @@ public class VectorOps {
         int outH = output.length;
         int outW = output[0].length;
         int vectorLen = SPECIES.length();
+        int paddedW = padded[0][0].length;
         
         // Process output positions
         for (int oh = 0; oh < outH; oh++) {
@@ -445,11 +446,18 @@ public class VectorOps {
             
             // Vectorize across output width where possible
             int ow = 0;
-            int upperBound = SPECIES.loopBound(outW);
             
             // Optimized for stride=1: can use direct array loading
             if (stride == 1) {
-                for (; ow < upperBound; ow += vectorLen) {
+                // Calculate safe upper bound - ensure we don't read past padded array
+                // For stride=1: we read from position (ow + kw) to (ow + kw + vectorLen - 1)
+                // Maximum read position: (upperBound - 1 + kernelSize - 1 + vectorLen - 1)
+                // This must be < paddedW, so: upperBound <= paddedW - kernelSize - vectorLen + 2
+                int safeUpperBound = Math.min(SPECIES.loopBound(outW), 
+                                              paddedW - kernelSize - vectorLen + 2);
+                safeUpperBound = Math.max(0, safeUpperBound);
+                
+                for (; ow < safeUpperBound; ow += vectorLen) {
                     FloatVector result = FloatVector.broadcast(SPECIES, bias);
                     
                     for (int c = 0; c < inputChannels; c++) {
@@ -471,6 +479,7 @@ public class VectorOps {
                 }
             } else {
                 // Generic case for stride > 1
+                int upperBound = SPECIES.loopBound(outW);
                 for (; ow < upperBound; ow += vectorLen) {
                     float[] results = new float[vectorLen];
                     
@@ -570,14 +579,12 @@ public class VectorOps {
                     int i = 0;
                     int upperBound = SPECIES.loopBound(poolArea);
                     
-                    if (poolArea >= SPECIES.length()) {
-                        FloatVector maxVector = FloatVector.fromArray(SPECIES, poolVals, 0);
-                        for (i = SPECIES.length(); i < upperBound; i += SPECIES.length()) {
-                            FloatVector v = FloatVector.fromArray(SPECIES, poolVals, i);
-                            maxVector = maxVector.max(v);
-                        }
-                        maxVal = maxVector.reduceLanes(VectorOperators.MAX);
+                    FloatVector maxVector = FloatVector.fromArray(SPECIES, poolVals, 0);
+                    for (i = SPECIES.length(); i < upperBound; i += SPECIES.length()) {
+                        FloatVector v = FloatVector.fromArray(SPECIES, poolVals, i);
+                        maxVector = maxVector.max(v);
                     }
+                    maxVal = maxVector.reduceLanes(VectorOperators.MAX);
                     
                     // Handle tail
                     for (; i < poolArea; i++) {
@@ -587,6 +594,7 @@ public class VectorOps {
                     }
                     
                     // Find the index of max value (needed for backprop)
+                    findMaxIdx:
                     for (int ph = 0; ph < poolSize; ph++) {
                         for (int pw = 0; pw < poolSize; pw++) {
                             int ih = startH + ph;
@@ -594,7 +602,7 @@ public class VectorOps {
                             if (input[ih][iw] == maxVal) {
                                 maxH = ih;
                                 maxW = iw;
-                                break;
+                                break findMaxIdx;
                             }
                         }
                     }

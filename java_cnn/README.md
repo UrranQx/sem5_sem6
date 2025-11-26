@@ -9,18 +9,21 @@ java_cnn/
 ├── src/main/java/cnn/
 │   ├── Main.java              # Главный файл с инициализацией, обучением и тестированием
 │   ├── CNN.java               # Класс нейронной сети
-│   ├── layers/                # Слои нейронной сети
+│   ├── layers/                # Слои нейронной сети (с Vector API оптимизацией)
 │   │   ├── Layer.java         # Интерфейс слоя
-│   │   ├── ConvLayer.java     # Сверточный слой
-│   │   ├── MaxPoolLayer.java  # Слой макс-пулинга
-│   │   ├── ReLULayer.java     # Функция активации ReLU
+│   │   ├── ConvLayer.java     # Сверточный слой (векторизованный)
+│   │   ├── MaxPoolLayer.java  # Слой макс-пулинга (векторизованный)
+│   │   ├── ReLULayer.java     # Функция активации ReLU (векторизованная)
 │   │   ├── FlattenLayer.java  # Слой выравнивания
 │   │   ├── DenseLayer.java    # Полносвязный слой
 │   │   └── SoftmaxLayer.java  # Softmax с кросс-энтропией
 │   ├── utils/                 # Утилиты
 │   │   ├── VectorOps.java     # Векторизованные операции (Vector API)
-│   │   ├── Tensor3D.java      # 3D тензор для изображений
+│   │   ├── Tensor3D.java      # 3D тензор для изображений (с Vector API)
 │   │   └── ConfusionMatrix.java # Матрица ошибок
+│   ├── benchmark/             # Бенчмарки для сравнения производительности
+│   │   ├── VectorBenchmark.java # Сравнение Vector API vs Scalar
+│   │   └── ScalarOps.java     # Скалярные (не-векторизованные) операции
 │   └── data/
 │       └── MNISTLoader.java   # Загрузчик данных MNIST
 └── README.md
@@ -68,13 +71,19 @@ javac --add-modules jdk.incubator.vector -d build $(find src -name "*.java")
 ```
 Или
 ```bash
-javac --add-modules jdk.incubator.vector -d build src/main/java/cnn/*.java src/main/java/cnn/layers/*.java src/main/java/cnn/utils/*.java src/main/java/cnn/data/*.java
+javac --add-modules jdk.incubator.vector -d build src/main/java/cnn/*.java src/main/java/cnn/layers/*.java src/main/java/cnn/utils/*.java src/main/java/cnn/data/*.java src/main/java/cnn/benchmark/*.java
 ```
 
 ## Запуск
 
 ```bash
 java --add-modules jdk.incubator.vector -cp build cnn.Main
+```
+
+## Запуск бенчмарка (сравнение Vector API vs Scalar)
+
+```bash
+java --add-modules jdk.incubator.vector -cp build cnn.benchmark.VectorBenchmark
 ```
 
 ## Использование реальных данных MNIST
@@ -113,14 +122,56 @@ private static final double TRAIN_RATIO = 0.7;      // Соотношение о
 
 ## Использование Java Vector API
 
-Java Vector API используется для ускорения вычислений в классе `VectorOps.java`:
+Java Vector API используется для ускорения вычислений во всех ключевых операциях CNN:
 
-- Сложение/вычитание/умножение векторов
-- Скалярное произведение
-- ReLU активация
-- Матрично-векторное умножение
+### Оптимизированные слои:
 
-Пример использования Vector API:
+1. **ConvLayer** - сверточный слой с SIMD-оптимизацией:
+   - Прямой проход использует векторизованные операции для stride=1
+   - Обратный проход с векторизованным обновлением весов
+
+2. **MaxPoolLayer** - слой макс-пулинга:
+   - Векторизованный поиск максимума для больших пулов
+
+3. **ReLULayer** - функция активации:
+   - Векторизованный ReLU для 1D массивов и 3D тензоров
+   - Векторизованный обратный проход
+
+4. **Tensor3D** - 3D тензор:
+   - Векторизованные операции: flatten, fromFlattened, relu, copy, pad, add, scale
+
+### Класс VectorOps
+
+Содержит все векторизованные операции:
+
+```java
+// Базовые операции
+VectorOps.add(a, b)           // Сложение массивов
+VectorOps.subtract(a, b)      // Вычитание массивов
+VectorOps.multiply(a, b)      // Поэлементное умножение
+VectorOps.scale(a, scalar)    // Умножение на скаляр
+VectorOps.dot(a, b)           // Скалярное произведение
+
+// Активации
+VectorOps.relu(a)             // ReLU активация
+VectorOps.softmax(a)          // Softmax активация
+VectorOps.relu3D(input, output)  // ReLU для 3D тензоров
+
+// Операции с матрицами
+VectorOps.matVecMul(matrix, vec)  // Матрично-векторное умножение
+VectorOps.transpose(matrix)       // Транспонирование
+
+// Операции свертки и пулинга
+VectorOps.convolveFilter(...)     // Векторизованная свертка
+VectorOps.maxPool2D(...)          // Векторизованный макс-пулинг
+
+// In-place операции (для экономии памяти)
+VectorOps.addInPlace(a, b)
+VectorOps.scaleInPlace(a, scalar)
+VectorOps.reluInPlace(a)
+```
+
+### Пример использования Vector API:
 ```java
 private static final VectorSpecies<Float> SPECIES = FloatVector.SPECIES_PREFERRED;
 
@@ -137,6 +188,28 @@ public static float[] add(float[] a, float[] b) {
     return result;
 }
 ```
+
+## Результаты бенчмарков
+
+Сравнение производительности Vector API vs скалярных операций (AVX2, 8 floats per vector):
+
+| Операция | Размер | Scalar | Vector | Ускорение |
+|----------|--------|--------|--------|-----------|
+| Dot Product | 4096 | 3.83ms | 0.49ms | **7.77x** |
+| Dot Product | 65536 | 61.49ms | 7.96ms | **7.73x** |
+| MatVec 128x784 | 100352 | 88.27ms | 9.80ms | **9.00x** |
+| MatVec 1024x1024 | 1048576 | 944.36ms | 103.19ms | **9.15x** |
+| Conv 16x32x32 k=3 | 16384 | 18.62ms | 11.42ms | **1.63x** |
+| Conv 32x64x64 k=3 | 131072 | 154.63ms | 95.59ms | **1.62x** |
+| ReLU3D 64x64x64 | 262144 | 16.57ms | 9.44ms | **1.76x** |
+
+**Ключевые результаты:**
+- Матрично-векторное умножение: **~9x ускорение** (критично для Dense слоёв)
+- Скалярное произведение: **~7-8x ускорение** (основа матричных операций)
+- Свертка: **~1.6x ускорение** для больших входных данных
+- 3D ReLU: **~1.8x ускорение** для больших тензоров
+
+> **Примечание:** Для небольших массивов (< 256 элементов) накладные расходы на векторизацию могут превышать выигрыш. Основной выигрыш достигается на больших данных.
 
 ## Вывод программы
 

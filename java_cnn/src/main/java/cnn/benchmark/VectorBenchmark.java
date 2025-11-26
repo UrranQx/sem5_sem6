@@ -385,6 +385,8 @@ public class VectorBenchmark {
             int height = config[0];
             int width = config[1];
             int poolSize = config[2];
+            // stride = poolSize for non-overlapping pooling (common configuration)
+            int stride = poolSize;
             
             Random rand = new Random(42);
             float[][] input = new float[height][width];
@@ -392,8 +394,8 @@ public class VectorBenchmark {
                 input[h] = randomArray(width, rand);
             }
             
-            int outH = (height - poolSize) / poolSize + 1;
-            int outW = (width - poolSize) / poolSize + 1;
+            int outH = (height - poolSize) / stride + 1;
+            int outW = (width - poolSize) / stride + 1;
             
             float[][] outputScalar = new float[outH][outW];
             int[][] indicesHScalar = new int[outH][outW];
@@ -405,8 +407,8 @@ public class VectorBenchmark {
             
             // Warmup
             for (int i = 0; i < WARMUP_ITERATIONS; i++) {
-                ScalarOps.maxPool2D(input, outputScalar, indicesHScalar, indicesWScalar, poolSize, poolSize);
-                VectorOps.maxPool2D(input, outputVector, indicesHVector, indicesWVector, poolSize, poolSize);
+                ScalarOps.maxPool2D(input, outputScalar, indicesHScalar, indicesWScalar, poolSize, stride);
+                VectorOps.maxPool2D(input, outputVector, indicesHVector, indicesWVector, poolSize, stride);
             }
             
             // Scalar benchmark
@@ -419,7 +421,7 @@ public class VectorBenchmark {
             // Vector benchmark
             long vectorStart = System.nanoTime();
             for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
-                VectorOps.maxPool2D(input, outputVector, indicesHVector, indicesWVector, poolSize, poolSize);
+                VectorOps.maxPool2D(input, outputVector, indicesHVector, indicesWVector, poolSize, stride);
             }
             long vectorTime = System.nanoTime() - vectorStart;
             

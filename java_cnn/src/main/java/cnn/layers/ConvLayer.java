@@ -86,17 +86,23 @@ public class ConvLayer implements Layer {
     private void vectorizedConvolveFilter(float[][][] padded, float[][][] kernel, 
                                            float[][] output, float bias, int outH, int outW) {
         int vectorLen = SPECIES.length();
+        int paddedW = padded[0][0].length;
         
         for (int oh = 0; oh < outH; oh++) {
             int ih = oh * stride;
             
             // Process output width with vectorization
             int ow = 0;
-            int upperBound = SPECIES.loopBound(outW);
             
             // Vectorized processing - optimized for stride=1
             if (stride == 1) {
-                for (; ow < upperBound; ow += vectorLen) {
+                // Calculate safe upper bound - ensure we don't read past padded array
+                // For stride=1: we read from position (ow + kw) to (ow + kw + vectorLen - 1)
+                int safeUpperBound = Math.min(SPECIES.loopBound(outW), 
+                                              paddedW - kernelSize - vectorLen + 2);
+                safeUpperBound = Math.max(0, safeUpperBound);
+                
+                for (; ow < safeUpperBound; ow += vectorLen) {
                     // Initialize result vectors with bias
                     FloatVector result = FloatVector.broadcast(SPECIES, bias);
                     
@@ -123,6 +129,7 @@ public class ConvLayer implements Layer {
                 }
             } else {
                 // Generic case for stride > 1 (with gather)
+                int upperBound = SPECIES.loopBound(outW);
                 for (; ow < upperBound; ow += vectorLen) {
                     // Initialize result vectors with bias
                     FloatVector result = FloatVector.broadcast(SPECIES, bias);

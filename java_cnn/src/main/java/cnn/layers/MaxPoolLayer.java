@@ -103,13 +103,13 @@ public class MaxPoolLayer implements Layer {
                     }
                     
                     // Find the position of the maximum value (needed for backprop)
+                    findMaxPos:
                     for (int ph = 0; ph < poolSize; ph++) {
                         for (int pw = 0; pw < poolSize; pw++) {
                             if (input[startH + ph][startW + pw] == maxVal) {
                                 maxH = startH + ph;
                                 maxW = startW + pw;
-                                ph = poolSize; // break outer loop
-                                break;
+                                break findMaxPos;
                             }
                         }
                     }

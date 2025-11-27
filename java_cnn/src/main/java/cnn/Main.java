@@ -3,6 +3,8 @@ package cnn;
 import cnn.data.MNISTLoader;
 import cnn.data.MNISTLoader.DataSplit;
 import cnn.layers.*;
+import cnn.training.BatchTrainer;
+import cnn.training.ParallelUtils;
 import cnn.utils.ConfusionMatrix;
 import cnn.utils.Tensor3D;
 
@@ -35,10 +37,25 @@ public class Main {
     private static final long SEED = 42;
     private static final int SAMPLE_DISPLAY_COUNT = 10;
     
+    // Batch training parameters
+    private static final int BATCH_SIZE = 32;  // Mini-batch size for training
+    private static final boolean USE_BATCH_TRAINING = true;  // Toggle batch vs single-sample training
+    private static final boolean USE_PARALLEL_EVAL = true;   // Toggle parallel evaluation
+    
     public static void main(String[] args) {
         System.out.println("=" .repeat(60));
         System.out.println("CNN for MNIST Classification using Java Vector API");
+        System.out.println("With Batch Training and Multi-threading Support");
         System.out.println("=" .repeat(60));
+        
+        // Print configuration
+        System.out.println("\nConfiguration:");
+        System.out.println("  Learning Rate: " + LEARNING_RATE);
+        System.out.println("  Epochs: " + EPOCHS);
+        System.out.println("  Batch Size: " + BATCH_SIZE);
+        System.out.println("  Batch Training: " + (USE_BATCH_TRAINING ? "Enabled" : "Disabled"));
+        System.out.println("  Parallel Evaluation: " + (USE_PARALLEL_EVAL ? "Enabled" : "Disabled"));
+        System.out.println("  Available Processors: " + Runtime.getRuntime().availableProcessors());
         
         try {
             // Load MNIST data
@@ -71,16 +88,31 @@ public class Main {
             
             // Training
             System.out.println("\n[4] Training the network...");
-            trainNetwork(cnn, data);
+            if (USE_BATCH_TRAINING) {
+                trainNetworkBatch(cnn, data);
+            } else {
+                trainNetwork(cnn, data);
+            }
             
             // Testing
             System.out.println("\n[5] Evaluating on test set...");
-            ConfusionMatrix confMatrix = evaluateNetwork(cnn, data);
+            ConfusionMatrix confMatrix;
+            if (USE_PARALLEL_EVAL) {
+                confMatrix = evaluateNetworkParallel(cnn, data);
+            } else {
+                confMatrix = evaluateNetwork(cnn, data);
+            }
             confMatrix.print();
             
             // Display samples
             System.out.println("\n[6] Displaying sample predictions...");
             displaySamples(cnn, data, SAMPLE_DISPLAY_COUNT);
+            
+            // Run parallel benchmark if we have enough samples
+            if (data.testX.length >= 100) {
+                System.out.println("\n[7] Running parallel prediction benchmark...");
+                System.out.println(ParallelUtils.benchmarkPrediction(cnn, data.testX));
+            }
             
             System.out.println("\n" + "=" .repeat(60));
             System.out.println("Done!");
@@ -168,6 +200,32 @@ public class Main {
     }
     
     /**
+     * Train the network using mini-batch training
+     * Processes samples in batches for more stable gradient updates
+     */
+    private static void trainNetworkBatch(CNN cnn, DataSplit data) {
+        BatchTrainer trainer = new BatchTrainer(cnn, LEARNING_RATE, BATCH_SIZE);
+        System.out.println("Using batch training with batch size: " + BATCH_SIZE);
+        System.out.println("Number of batches per epoch: " + 
+            (data.trainX.length + BATCH_SIZE - 1) / BATCH_SIZE);
+        
+        for (int epoch = 0; epoch < EPOCHS; epoch++) {
+            long startTime = System.currentTimeMillis();
+            
+            // Use different seed for each epoch for different shuffling
+            BatchTrainer.TrainingResult result = trainer.trainEpoch(
+                data.trainX, data.trainY, data.trainLabels, SEED + epoch);
+            
+            long endTime = System.currentTimeMillis();
+            
+            System.out.printf("Epoch %d/%d completed in %.1fs - Loss: %.4f, Accuracy: %.2f%%%n", 
+                epoch + 1, EPOCHS, (endTime - startTime) / 1000.0, result.loss, result.accuracy);
+        }
+        
+        trainer.shutdown();
+    }
+    
+    /**
      * Evaluate the network on test data
      */
     private static ConfusionMatrix evaluateNetwork(CNN cnn, DataSplit data) {
@@ -184,6 +242,24 @@ public class Main {
             }
         }
         System.out.println();
+        
+        return confMatrix;
+    }
+    
+    /**
+     * Evaluate the network on test data using parallel processing
+     */
+    private static ConfusionMatrix evaluateNetworkParallel(CNN cnn, DataSplit data) {
+        System.out.println("Using parallel evaluation with " + 
+            Runtime.getRuntime().availableProcessors() + " processors");
+        
+        long startTime = System.currentTimeMillis();
+        ConfusionMatrix confMatrix = ParallelUtils.parallelEvaluate(
+            cnn, data.testX, data.testLabels, 10);
+        long endTime = System.currentTimeMillis();
+        
+        System.out.printf("Parallel evaluation completed in %.1fs%n", 
+            (endTime - startTime) / 1000.0);
         
         return confMatrix;
     }

@@ -21,6 +21,9 @@ java_cnn/
 │   │   ├── VectorOps.java     # Векторизованные операции (Vector API)
 │   │   ├── Tensor3D.java      # 3D тензор для изображений (с Vector API)
 │   │   └── ConfusionMatrix.java # Матрица ошибок
+│   ├── training/              # Классы для обучения (NEW!)
+│   │   ├── BatchTrainer.java  # Mini-batch обучение с многопоточностью
+│   │   └── ParallelUtils.java # Утилиты для параллельных вычислений
 │   ├── benchmark/             # Бенчмарки для сравнения производительности
 │   │   ├── VectorBenchmark.java # Сравнение Vector API vs Scalar
 │   │   └── ScalarOps.java     # Скалярные (не-векторизованные) операции
@@ -118,7 +121,79 @@ java --add-modules jdk.incubator.vector -cp build cnn.benchmark.VectorBenchmark
 private static final float LEARNING_RATE = 0.001f;  // Скорость обучения
 private static final int EPOCHS = 3;                // Количество эпох
 private static final double TRAIN_RATIO = 0.7;      // Соотношение обучение/тест (70%/30%)
+
+// Параметры batch-обучения и многопоточности
+private static final int BATCH_SIZE = 32;           // Размер мини-батча
+private static final boolean USE_BATCH_TRAINING = true;  // Включить/выключить batch-обучение
+private static final boolean USE_PARALLEL_EVAL = true;   // Включить/выключить параллельную оценку
 ```
+
+## Mini-Batch обучение (NEW!)
+
+Mini-batch обучение позволяет обрабатывать несколько образцов за один шаг обновления весов:
+
+### Преимущества batch-обучения:
+1. **Более стабильные градиенты** - усреднение по батчу уменьшает шум
+2. **Лучшее использование аппаратных ресурсов** - векторизованные операции на батчах
+3. **Возможность параллельной обработки** - разные образцы могут обрабатываться параллельно
+4. **Улучшенная сходимость** - во многих случаях batch-обучение сходится быстрее
+
+### Использование BatchTrainer:
+```java
+BatchTrainer trainer = new BatchTrainer(cnn, learningRate, batchSize);
+// или с явным указанием числа потоков:
+BatchTrainer trainer = new BatchTrainer(cnn, learningRate, batchSize, numThreads);
+
+// Обучение одной эпохи
+BatchTrainer.TrainingResult result = trainer.trainEpoch(trainX, trainY, trainLabels, seed);
+System.out.println("Loss: " + result.loss + ", Accuracy: " + result.accuracy);
+
+// Параллельное предсказание
+int[] predictions = trainer.parallelPredict(testX, testLabels);
+
+// Не забудьте закрыть тренер
+trainer.shutdown();
+```
+
+## Многопоточность и параллельные вычисления (NEW!)
+
+### ParallelUtils - утилиты для параллельных операций:
+
+```java
+// Параллельное предсказание с использованием ForkJoinPool
+int[] predictions = ParallelUtils.parallelPredict(cnn, inputs);
+
+// Параллельная оценка с построением confusion matrix
+ConfusionMatrix matrix = ParallelUtils.parallelEvaluate(cnn, testX, testLabels, 10);
+
+// Параллельное вычисление accuracy
+float accuracy = ParallelUtils.parallelAccuracy(predictions, labels);
+
+// Предсказание с явным контролем числа потоков
+int[] predictions = ParallelUtils.chunkedParallelPredict(cnn, inputs, numThreads);
+
+// Бенчмарк сравнения последовательной и параллельной обработки
+String benchmarkResults = ParallelUtils.benchmarkPrediction(cnn, testX);
+```
+
+### Пример вывода бенчмарка параллельного предсказания:
+```
+==================================================
+Prediction Benchmark (2100 samples)
+==================================================
+Sequential: 1234 ms (1701.46 samples/sec)
+Parallel:   456 ms (4605.26 samples/sec)
+Speedup:    2.71x
+Results match: Yes
+==================================================
+```
+
+### Рекомендации по использованию многопоточности:
+
+1. **Параллельное предсказание** - безопасно использовать, т.к. forward pass независим
+2. **Параллельное обучение** - требует осторожности из-за состояния слоев
+3. **Оптимальное число потоков** - обычно равно числу ядер CPU
+4. **Синхронизация** - используется для thread-safety при доступе к CNN
 
 ## Использование Java Vector API
 
@@ -222,6 +297,24 @@ public static float[] add(float[] a, float[] b) {
    - Recall (полнота)
    - F1-Score
 6. **10 примеров** с ASCII-визуализацией и предсказаниями
+7. **Бенчмарк параллельного предсказания** (сравнение скорости)
+
+## Дополнительные способы оптимизации (потенциальные улучшения)
+
+### Реализованные оптимизации:
+- ✅ Java Vector API (SIMD) для всех основных операций
+- ✅ Mini-batch обучение (BatchTrainer)
+- ✅ Параллельное предсказание (ParallelUtils)
+- ✅ Параллельная оценка с confusion matrix
+
+### Возможные будущие улучшения:
+1. **GPU-ускорение** - использование OpenCL/CUDA через JNI или TornadoVM
+2. **Data augmentation** - увеличение датасета путем трансформаций
+3. **Learning rate scheduling** - динамическое изменение скорости обучения
+4. **Dropout слои** - регуляризация для предотвращения переобучения
+5. **Batch Normalization** - нормализация активаций между слоями
+6. **Adam/RMSprop оптимизаторы** - вместо простого SGD
+7. **Распределенное обучение** - обучение на нескольких машинах
 
 ## Автор
 

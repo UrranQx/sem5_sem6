@@ -106,6 +106,10 @@ public class BatchTrainer {
     /**
      * Parallel evaluation on test data
      * 
+     * Note: Due to CNN internal state (lastInput/lastOutput stored for backprop),
+     * predictions are synchronized. This provides thread safety but serializes
+     * CNN access. For true parallelism, consider using separate CNN instances.
+     * 
      * @param testX Test images
      * @param testLabels Integer labels
      * @return Array of predictions
@@ -125,8 +129,8 @@ public class BatchTrainer {
             
             executor.submit(() -> {
                 try {
-                    // Each thread creates a copy of CNN for thread-safe inference
-                    // Note: In production, you'd want proper thread-safe forward pass
+                    // Synchronized access to CNN for thread safety
+                    // Trade-off: serialized predictions, but thread-safe execution
                     for (int i = start; i < end; i++) {
                         synchronized (cnn) {
                             predictions[i] = cnn.predict(testX[i]);

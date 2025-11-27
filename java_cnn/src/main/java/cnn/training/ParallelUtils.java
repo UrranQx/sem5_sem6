@@ -4,10 +4,7 @@ import cnn.CNN;
 import cnn.utils.Tensor3D;
 import cnn.utils.ConfusionMatrix;
 
-import java.util.Random;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.DoubleAdder;
 import java.util.stream.IntStream;
 
 /**
@@ -18,10 +15,17 @@ import java.util.stream.IntStream;
  * - Parallel evaluation with confusion matrix
  * - Batch prediction with thread pool
  * 
- * Note: Training is kept sequential because CNN layers maintain internal state
- * (lastInput, lastOutput) for backpropagation. For true parallel training,
- * you would need to clone the network for each thread or use gradient accumulation
- * with proper synchronization.
+ * Note on thread safety:
+ * CNN layers maintain internal state (lastInput, lastOutput) for backpropagation.
+ * For inference-only operations, we use synchronization to ensure thread safety.
+ * This serializes access to the CNN but still provides benefits:
+ * - Better resource utilization (other threads can prepare data while one does inference)
+ * - Simpler code without requiring layer cloning
+ * 
+ * For maximum parallelism in production, consider:
+ * - Implementing thread-safe forward pass without state storage
+ * - Creating separate CNN instances per thread (requires full clone support)
+ * - Using batch inference with properly shaped tensors
  */
 public class ParallelUtils {
     
@@ -29,18 +33,21 @@ public class ParallelUtils {
     
     /**
      * Parallel prediction using ForkJoinPool
-     * Each prediction is independent, so this is perfectly parallelizable
      * 
-     * @param cnn The CNN model (must be thread-safe for forward pass only)
+     * Note: Due to CNN internal state requirements, predictions are synchronized.
+     * The parallelism benefit comes from overlapping data preparation and I/O
+     * operations with computation. For true parallel inference, use separate
+     * CNN instances or implement stateless forward pass.
+     * 
+     * @param cnn The CNN model (access is synchronized for thread safety)
      * @param inputs Array of input tensors
      * @return Array of predicted class labels
      */
     public static int[] parallelPredict(CNN cnn, Tensor3D[] inputs) {
         int[] predictions = new int[inputs.length];
         
-        // Use parallel streams for simple parallelization
-        // Note: CNN forward pass may not be thread-safe due to internal state
-        // This works for inference if we don't need backward pass
+        // Use parallel streams - synchronization ensures thread safety
+        // Trade-off: serialized CNN access, but parallel data handling
         IntStream.range(0, inputs.length)
             .parallel()
             .forEach(i -> {
@@ -49,6 +56,21 @@ public class ParallelUtils {
                 }
             });
         
+        return predictions;
+    }
+    
+    /**
+     * Sequential prediction for baseline comparison
+     * 
+     * @param cnn The CNN model
+     * @param inputs Array of input tensors
+     * @return Array of predicted class labels
+     */
+    public static int[] sequentialPredict(CNN cnn, Tensor3D[] inputs) {
+        int[] predictions = new int[inputs.length];
+        for (int i = 0; i < inputs.length; i++) {
+            predictions[i] = cnn.predict(inputs[i]);
+        }
         return predictions;
     }
     
@@ -65,7 +87,7 @@ public class ParallelUtils {
         ConfusionMatrix confMatrix = new ConfusionMatrix(numClasses);
         int testSize = testX.length;
         
-        // Collect predictions in parallel
+        // Collect predictions (synchronized internally)
         int[] predictions = parallelPredict(cnn, testX);
         
         // Build confusion matrix (sequential, fast)
@@ -94,7 +116,8 @@ public class ParallelUtils {
     
     /**
      * Chunked parallel prediction with explicit thread pool
-     * Better for fine-grained control and when CNN is not thread-safe
+     * Provides finer control over threading but still requires synchronization
+     * for CNN access.
      * 
      * @param cnn The CNN model
      * @param inputs Input tensors
@@ -116,6 +139,7 @@ public class ParallelUtils {
                 
                 executor.submit(() -> {
                     try {
+                        // Each thread processes its chunk with synchronized CNN access
                         for (int i = start; i < end; i++) {
                             synchronized (cnn) {
                                 predictions[i] = cnn.predict(inputs[i]);
@@ -141,6 +165,10 @@ public class ParallelUtils {
     /**
      * Benchmark comparison between sequential and parallel prediction
      * 
+     * Note: Due to CNN synchronization requirements, parallel version may not
+     * show significant speedup for pure inference. Main benefit is in mixed
+     * workloads where data preparation can overlap with computation.
+     * 
      * @param cnn The CNN model
      * @param inputs Test inputs
      * @return Benchmark results as formatted string
@@ -153,24 +181,24 @@ public class ParallelUtils {
         
         // Sequential
         long startSeq = System.currentTimeMillis();
-        int[] seqPredictions = new int[inputs.length];
-        for (int i = 0; i < inputs.length; i++) {
-            seqPredictions[i] = cnn.predict(inputs[i]);
-        }
+        int[] seqPredictions = sequentialPredict(cnn, inputs);
         long seqTime = System.currentTimeMillis() - startSeq;
         sb.append(String.format("Sequential: %d ms (%.2f samples/sec)%n", 
-            seqTime, inputs.length * 1000.0 / seqTime));
+            seqTime, inputs.length * 1000.0 / Math.max(1, seqTime)));
         
-        // Parallel
+        // Parallel (with synchronization)
         long startPar = System.currentTimeMillis();
         int[] parPredictions = parallelPredict(cnn, inputs);
         long parTime = System.currentTimeMillis() - startPar;
         sb.append(String.format("Parallel:   %d ms (%.2f samples/sec)%n", 
-            parTime, inputs.length * 1000.0 / parTime));
+            parTime, inputs.length * 1000.0 / Math.max(1, parTime)));
         
         // Speedup
-        double speedup = (double) seqTime / parTime;
+        double speedup = seqTime > 0 ? (double) seqTime / Math.max(1, parTime) : 1.0;
         sb.append(String.format("Speedup:    %.2fx%n", speedup));
+        
+        // Note about synchronization
+        sb.append("Note: Parallelism limited by CNN synchronization\n");
         
         // Verify correctness
         boolean match = true;
